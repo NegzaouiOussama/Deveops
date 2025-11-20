@@ -13,13 +13,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
-            }
-        }
-        
-        stage('Build') {
-            steps {
-                sh 'mvn clean compile'
+                git branch: 'main', url: 'https://github.com/NegzaouiOussama/Deveops.git'
             }
         }
         
