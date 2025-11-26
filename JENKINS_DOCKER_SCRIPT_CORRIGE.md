@@ -259,4 +259,3 @@ jenkins ALL=(ALL) NOPASSWD: /usr/bin/docker
 
 3. Sauvegarder et tester
 
-

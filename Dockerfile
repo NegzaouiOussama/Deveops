@@ -16,18 +16,25 @@ FROM eclipse-temurin:17-jre-alpine
 
 WORKDIR /app
 
+# Install wget for healthcheck (before switching user)
+RUN apk add --no-cache wget
+
 # Create a non-root user
 RUN addgroup -S spring && adduser -S spring -G spring
-USER spring:spring
 
 # Copy the JAR from build stage
 COPY --from=build /app/target/student-management-0.0.1-SNAPSHOT.jar app.jar
 
+# Change ownership of app.jar to spring user
+RUN chown spring:spring app.jar
+
+# Switch to non-root user
+USER spring:spring
+
 # Expose port
 EXPOSE 8089
 
-# Health check (install wget for healthcheck)
-RUN apk add --no-cache wget
+# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8089/student/actuator/health || exit 1
 
