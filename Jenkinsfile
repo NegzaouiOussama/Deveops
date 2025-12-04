@@ -10,6 +10,10 @@ pipeline {
         PATH = "${env.MAVEN_HOME}/bin:${env.PATH}"
         SONAR_HOST_URL = "http://172.29.114.102:9000"
         SONAR_TOKEN = "sqa_53a643aea3ccdbcedef2c73df0428a1d8397d01e"
+        DOCKER_USERNAME = "negzaoui"
+        DOCKER_PASSWORD = "dckr_pat_o-R1u9Ij5dpajyvfK7xcH6PRP6w"
+        DOCKER_IMAGE_NAME = "student-management"
+        DOCKER_IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
     
     stages {
@@ -61,12 +65,37 @@ pipeline {
                 }
             }
         }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh """
+                        docker build -t ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} .
+                        docker tag ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest
+                    """
+                }
+            }
+        }
+        
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    sh """
+                        echo ${env.DOCKER_PASSWORD} | docker login -u ${env.DOCKER_USERNAME} --password-stdin
+                        docker push ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}
+                        docker push ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest
+                    """
+                }
+            }
+        }
     }
     
     post {
         success {
             echo 'Pipeline réussi avec succès!'
             echo "SonarQube Dashboard: ${env.SONAR_HOST_URL}/dashboard?id=tn.esprit:student-management"
+            echo "Docker Image: ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}"
+            echo "Docker Hub: https://hub.docker.com/r/${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}"
         }
         failure {
             echo 'Pipeline a échoué!'

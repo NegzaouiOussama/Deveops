@@ -17,6 +17,10 @@ pipeline {
         PATH = "${env.MAVEN_HOME}/bin:${env.PATH}"
         SONAR_HOST_URL = "http://172.29.114.102:9000"
         SONAR_TOKEN = "sqa_53a643aea3ccdbcedef2c73df0428a1d8397d01e"
+        DOCKER_USERNAME = "negzaoui"
+        DOCKER_PASSWORD = "dckr_pat_o-R1u9Ij5dpajyvfK7xcH6PRP6w"
+        DOCKER_IMAGE_NAME = "student-management"
+        DOCKER_IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
     
     stages {
@@ -66,12 +70,37 @@ pipeline {
                 }
             }
         }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh """
+                        docker build -t ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} .
+                        docker tag ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest
+                    """
+                }
+            }
+        }
+        
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    sh """
+                        echo ${env.DOCKER_PASSWORD} | docker login -u ${env.DOCKER_USERNAME} --password-stdin
+                        docker push ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}
+                        docker push ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest
+                    """
+                }
+            }
+        }
     }
     
     post {
         success {
             echo 'Pipeline réussi avec succès!'
             echo "SonarQube Dashboard: ${env.SONAR_HOST_URL}/dashboard?id=tn.esprit:student-management"
+            echo "Docker Image: ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}"
+            echo "Docker Hub: https://hub.docker.com/r/${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}"
         }
         failure {
             echo 'Pipeline a échoué!'
@@ -93,6 +122,8 @@ pipeline {
 - Stage "Generate JaCoCo Report" : `mvn jacoco:report` (génère le rapport XML)
 - Stage "Package" : `mvn package -DskipTests` (sans `clean` pour préserver le rapport)
 - SonarQube : Configuration JaCoCo pour afficher la couverture
+- **Build Docker Image** : Construction de l'image Docker avec tag de build
+- **Push Docker Image** : Push de l'image vers Docker Hub
 
 ## Comment Utiliser dans Jenkins
 
@@ -122,6 +153,44 @@ pipeline {
 8. **Script Path** : `Jenkinsfile`
 9. Cliquez sur **Save**
 
+## Prérequis pour Docker
+
+Avant d'utiliser ce pipeline avec Docker, assurez-vous que :
+
+1. **Docker est installé sur le serveur Jenkins** :
+   ```bash
+   docker --version
+   ```
+
+2. **L'agent Jenkins a accès à Docker** :
+   - L'utilisateur Jenkins doit être dans le groupe `docker`
+   - Ou utiliser un agent Docker avec Docker-in-Docker
+
+3. **Les credentials Docker Hub sont valides** :
+   - `DOCKER_USERNAME` : Votre nom d'utilisateur Docker Hub
+   - `DOCKER_PASSWORD` : Votre token d'accès Docker Hub (PAT - Personal Access Token)
+
+## Étapes Docker Ajoutées
+
+Le pipeline inclut maintenant deux nouvelles étapes Docker :
+
+### 1. Build Docker Image
+
+Cette étape :
+- Construit l'image Docker à partir du Dockerfile présent dans le projet
+- Tag l'image avec le numéro de build : `negzaoui/student-management:BUILD_NUMBER`
+- Tag également l'image avec `latest` : `negzaoui/student-management:latest`
+
+### 2. Push Docker Image
+
+Cette étape :
+- Se connecte à Docker Hub avec les credentials configurés
+- Push l'image taggée avec le numéro de build
+- Push l'image taggée avec `latest`
+
+Les images seront disponibles sur Docker Hub à :
+- `https://hub.docker.com/r/negzaoui/student-management`
+
 ## Vérification
 
 Après avoir configuré le pipeline :
@@ -131,6 +200,8 @@ Après avoir configuré le pipeline :
    - Stage "Test" : 6 tests doivent passer
    - Stage "Generate JaCoCo Report" : Rapport généré
    - Stage "MVN SONARQUBE" : Analyse réussie avec couverture
+   - Stage "Build Docker Image" : Image Docker construite avec succès
+   - Stage "Push Docker Image" : Image pushée vers Docker Hub
 
 3. **Vérifier dans SonarQube** :
    - URL : http://172.29.114.102:9000/dashboard?id=tn.esprit:student-management
@@ -142,4 +213,6 @@ Après avoir configuré le pipeline :
 ✅ **Coverage** : > 0% dans SonarQube
 ✅ **Rapport JaCoCo** : Généré dans `target/site/jacoco/jacoco.xml`
 ✅ **Analyse SonarQube** : Réussie avec couverture de code
+✅ **Image Docker** : Construite et pushée vers Docker Hub
+✅ **Docker Hub** : Image disponible à `negzaoui/student-management:BUILD_NUMBER` et `negzaoui/student-management:latest`
 
