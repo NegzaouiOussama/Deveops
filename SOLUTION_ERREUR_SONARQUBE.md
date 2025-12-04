@@ -69,13 +69,23 @@ Si vous voulez utiliser le projet "Deveops" qui existe déjà :
 
 ## Solution Recommandée : Créer le Projet
 
-### Étape 1 : Créer le Projet dans SonarQube
+### Étape 1 : Accéder à SonarQube
 
-1. Ouvrez SonarQube : http://localhost:9000
-2. **Projects** → **Create Project** → **Manually**
-3. **Project key** : `tn.esprit:student-management`
-4. **Display name** : `Student Management`
-5. **Set Up**
+1. Ouvrez votre navigateur
+2. Allez sur : **http://localhost:9000** (ou http://172.29.114.102:9000)
+3. Connectez-vous avec :
+   - **Login** : `admin`
+   - **Password** : `admin` (première fois), puis changez à `sonar`
+
+### Étape 2 : Créer le Projet dans SonarQube
+
+1. Dans SonarQube, cliquez sur **Projects** (en haut)
+2. Cliquez sur **Create Project** (bouton en haut à droite)
+3. Choisissez **Manually**
+4. Remplissez les champs :
+   - **Project key** : `tn.esprit:student-management`
+   - **Display name** : `Student Management`
+5. Cliquez sur **Set Up**
 
 ### Étape 2 : Créer un Token Global (Optionnel mais Recommandé)
 
