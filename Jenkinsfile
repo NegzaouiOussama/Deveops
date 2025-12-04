@@ -21,7 +21,7 @@ pipeline {
         
         stage('Test') {
             steps {
-                sh 'mvn test'
+                sh 'mvn clean test'
             }
             post {
                 always {
@@ -47,7 +47,8 @@ pipeline {
                     sh """
                         mvn sonar:sonar \\
                             -Dsonar.host.url=${env.SONAR_HOST_URL} \\
-                            -Dsonar.login=${env.SONAR_TOKEN}
+                            -Dsonar.login=${env.SONAR_TOKEN} \\
+                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
                     """
                 }
             }
