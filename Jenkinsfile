@@ -26,13 +26,21 @@ pipeline {
             post {
                 always {
                     junit 'target/surefire-reports/*.xml'
+                    // Sauvegarder le fichier jacoco.exec pour le rapport
+                    sh 'test -f target/jacoco.exec && echo "JaCoCo execution data saved" || echo "No JaCoCo execution data"'
                 }
+            }
+        }
+        
+        stage('Generate JaCoCo Report') {
+            steps {
+                sh 'mvn jacoco:report'
             }
         }
         
         stage('Package') {
             steps {
-                sh 'mvn clean package -DskipTests'
+                sh 'mvn package -DskipTests'
             }
             post {
                 success {
