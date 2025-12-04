@@ -8,6 +8,8 @@ pipeline {
     environment {
         MAVEN_HOME = "${tool 'Maven3'}"
         PATH = "${env.MAVEN_HOME}/bin:${env.PATH}"
+        SONAR_HOST_URL = "http://172.29.114.102:9000"
+        SONAR_TOKEN = "sqp_8dc68dea51a4ba5983fee4be1be10c4266e6ef4d"
     }
     
     stages {
@@ -35,6 +37,18 @@ pipeline {
             post {
                 success {
                     archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                }
+            }
+        }
+        
+        stage('MVN SONARQUBE') {
+            steps {
+                script {
+                    sh """
+                        mvn sonar:sonar \\
+                            -Dsonar.host.url=${env.SONAR_HOST_URL} \\
+                            -Dsonar.login=${env.SONAR_TOKEN}
+                    """
                 }
             }
         }
