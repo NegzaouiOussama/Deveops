@@ -9,7 +9,6 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  # Note: Pour Minikube, le storage-provisioner gère automatiquement les PVs
-  # Si vous utilisez hostPath manuellement, retirez storageClassName
-  # storageClassName: ""
+  # Pour Minikube, utiliser "standard" comme storageClassName par défaut
+  storageClassName: standard
 

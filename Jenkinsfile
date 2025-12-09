@@ -104,7 +104,8 @@ pipeline {
                 script {
                     sh """
                         kubectl apply -f k8s/mysql-secret.yaml
-                        kubectl apply -f k8s/mysql-pvc.yaml
+                        # Le PVC peut déjà exister avec des paramètres différents, on ignore l'erreur si c'est le cas
+                        kubectl apply -f k8s/mysql-pvc.yaml || echo "PVC mysql-pvc exists with different spec, continuing..."
                         kubectl apply -f k8s/mysql-deployment.yaml
                         kubectl apply -f k8s/mysql-service.yaml
                     """
