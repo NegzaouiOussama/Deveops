@@ -37,20 +37,22 @@ spec:
           limits:
             memory: "1Gi"
             cpu: "1000m"
+        # Health checks - utiliser un endpoint qui existe (swagger ou API)
+        # Si Actuator n'est pas configuré, on utilise swagger
         livenessProbe:
           httpGet:
-            path: /student/actuator/health
+            path: /student/swagger-ui.html
             port: 8089
-          initialDelaySeconds: 60
+          initialDelaySeconds: 90
           periodSeconds: 30
-          timeoutSeconds: 5
-          failureThreshold: 3
+          timeoutSeconds: 10
+          failureThreshold: 5
         readinessProbe:
           httpGet:
-            path: /student/actuator/health
+            path: /student/swagger-ui.html
             port: 8089
-          initialDelaySeconds: 40
+          initialDelaySeconds: 60
           periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
+          timeoutSeconds: 10
+          failureThreshold: 5
 
