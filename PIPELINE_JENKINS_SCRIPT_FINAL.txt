@@ -176,8 +176,9 @@ pipeline {
                         kubectl get deployment student-management -n devops || echo "Deployment check completed"
                         
                         echo "=== Getting NodePort for Application ==="
-                        NODEPORT=\$(kubectl get service student-management -n devops -o jsonpath='{.spec.ports[0].nodePort}' || echo "30080")
-                        MINIKUBE_IP=\$(minikube ip 2>/dev/null || kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' || echo "localhost")
+                        NODEPORT=\$(kubectl get service student-management -n devops -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "30080")
+                        # Obtenir l'IP du node directement via kubectl (plus fiable que minikube ip)
+                        MINIKUBE_IP=\$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo "192.168.49.2")
                         
                         echo "Application URL: http://\${MINIKUBE_IP}:\${NODEPORT}/student"
                         echo "Swagger UI: http://\${MINIKUBE_IP}:\${NODEPORT}/student/swagger-ui.html"
@@ -215,7 +216,7 @@ pipeline {
         success {
             script {
                 def NODEPORT = sh(script: "kubectl get service student-management -n devops -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo '30080'", returnStdout: true).trim()
-                def MINIKUBE_IP = sh(script: "minikube ip 2>/dev/null || kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type==\"InternalIP\")].address}' 2>/dev/null || echo 'localhost'", returnStdout: true).trim()
+                def MINIKUBE_IP = sh(script: "kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type==\"InternalIP\")].address}' 2>/dev/null || echo '192.168.49.2'", returnStdout: true).trim()
                 
                 echo '=========================================='
                 echo '✅ Pipeline réussi avec succès!'
