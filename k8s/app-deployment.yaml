@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: student-management
+  namespace: devops
+  labels:
+    app: student-management
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: student-management
+  template:
+    metadata:
+      labels:
+        app: student-management
+    spec:
+      containers:
+      - name: student-management
+        # Note: Le tag sera mis à jour par Jenkins avec le BUILD_NUMBER
+        image: negzaoui/student-management:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8089
+          name: http
+        envFrom:
+        # Charge toutes les variables depuis le ConfigMap
+        - configMapRef:
+            name: app-config
+        # Charge toutes les variables depuis le Secret
+        - secretRef:
+            name: app-secret
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /student/actuator/health
+            port: 8089
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /student/actuator/health
+            port: 8089
+          initialDelaySeconds: 40
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+

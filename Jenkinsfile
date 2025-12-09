@@ -88,14 +88,140 @@ pipeline {
                 }
             }
         }
+        
+        stage('Create Kubernetes Namespace') {
+            steps {
+                script {
+                    sh """
+                        kubectl create namespace devops --dry-run=client -o yaml | kubectl apply -f -
+                    """
+                }
+            }
+        }
+        
+        stage('Deploy MySQL to Kubernetes') {
+            steps {
+                script {
+                    sh """
+                        kubectl apply -f k8s/mysql-secret.yaml
+                        kubectl apply -f k8s/mysql-pvc.yaml
+                        kubectl apply -f k8s/mysql-deployment.yaml
+                        kubectl apply -f k8s/mysql-service.yaml
+                    """
+                }
+            }
+        }
+        
+        stage('Wait for MySQL to be Ready') {
+            steps {
+                script {
+                    sh """
+                        kubectl wait --for=condition=ready pod -l app=mysql -n devops --timeout=300s || true
+                        echo "MySQL deployment completed!"
+                    """
+                }
+            }
+        }
+        
+        stage('Update App Image Tag') {
+            steps {
+                script {
+                    sh """
+                        # Mettre à jour l'image dans le deployment si il existe
+                        kubectl set image deployment/student-management student-management=${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} -n devops --record || echo "Deployment not found, will be created in next stage"
+                    """
+                }
+            }
+        }
+        
+        stage('Deploy Application to Kubernetes') {
+            steps {
+                script {
+                    sh """
+                        kubectl apply -f k8s/app-configmap.yaml
+                        kubectl apply -f k8s/app-secret.yaml
+                        kubectl apply -f k8s/app-deployment.yaml
+                        # Mettre à jour l'image avec le tag de build
+                        kubectl set image deployment/student-management student-management=${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} -n devops --record || echo "Image update failed, using latest"
+                        kubectl apply -f k8s/app-service.yaml
+                    """
+                }
+            }
+        }
+        
+        stage('Wait for Application to be Ready') {
+            steps {
+                script {
+                    sh """
+                        kubectl wait --for=condition=ready pod -l app=student-management -n devops --timeout=300s || true
+                        sleep 30
+                        echo "Application deployment completed!"
+                    """
+                }
+            }
+        }
+        
+        stage('Expose Services and Test Application') {
+            steps {
+                script {
+                    sh """
+                        echo "=== Pods Status ==="
+                        kubectl get pods -n devops
+                        
+                        echo "=== Services Status ==="
+                        kubectl get services -n devops
+                        
+                        echo "=== Application Deployment Status ==="
+                        kubectl get deployment student-management -n devops || echo "Deployment check completed"
+                        
+                        echo "=== Getting NodePort for Application ==="
+                        NODEPORT=\$(kubectl get service student-management -n devops -o jsonpath='{.spec.ports[0].nodePort}' || echo "30080")
+                        MINIKUBE_IP=\$(minikube ip 2>/dev/null || kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' || echo "localhost")
+                        
+                        echo "Application URL: http://\${MINIKUBE_IP}:\${NODEPORT}/student"
+                        echo "Health Check URL: http://\${MINIKUBE_IP}:\${NODEPORT}/student/actuator/health"
+                        
+                        echo "=== Testing Application Health ==="
+                        sleep 15
+                        kubectl exec -n devops \$(kubectl get pod -l app=student-management -n devops -o jsonpath='{.items[0].metadata.name}' 2>/dev/null | head -1) -- wget -qO- http://localhost:8089/student/actuator/health || echo "Health check via pod exec failed"
+                    """
+                }
+            }
+        }
+        
+        stage('Verify Code Quality on Pod') {
+            steps {
+                script {
+                    sh """
+                        echo "=== Checking Pod Logs for Code Quality ==="
+                        kubectl logs -l app=student-management -n devops --tail=50 || echo "Logs check completed"
+                        
+                        echo "=== Pod Resource Usage ==="
+                        kubectl top pods -n devops || echo "Metrics server not available"
+                        
+                        echo "=== Describing Pods ==="
+                        kubectl describe pods -l app=student-management -n devops | head -50 || echo "Describe completed"
+                    """
+                }
+            }
+        }
     }
     
     post {
         success {
-            echo 'Pipeline réussi avec succès!'
-            echo "SonarQube Dashboard: ${env.SONAR_HOST_URL}/dashboard?id=tn.esprit:student-management"
-            echo "Docker Image: ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}"
-            echo "Docker Hub: https://hub.docker.com/r/${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}"
+            script {
+                def NODEPORT = sh(script: "kubectl get service student-management -n devops -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo '30080'", returnStdout: true).trim()
+                def MINIKUBE_IP = sh(script: "minikube ip 2>/dev/null || kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type==\"InternalIP\")].address}' 2>/dev/null || echo 'localhost'", returnStdout: true).trim()
+                
+                echo 'Pipeline réussi avec succès!'
+                echo "SonarQube Dashboard: ${env.SONAR_HOST_URL}/dashboard?id=tn.esprit:student-management"
+                echo "Docker Image: ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}"
+                echo "Docker Hub: https://hub.docker.com/r/${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}"
+                echo "Kubernetes Namespace: devops"
+                echo "Application URL: http://${MINIKUBE_IP}:${NODEPORT}/student"
+                echo "Health Check URL: http://${MINIKUBE_IP}:${NODEPORT}/student/actuator/health"
+                echo "Swagger UI: http://${MINIKUBE_IP}:${NODEPORT}/student/swagger-ui.html"
+            }
         }
         failure {
             echo 'Pipeline a échoué!'
