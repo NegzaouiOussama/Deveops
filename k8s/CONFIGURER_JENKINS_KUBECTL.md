@@ -95,6 +95,7 @@ users:
 ### Étape 5 : Donner les droits à Jenkins sur les fichiers
 
 ```bash
+********
 # Donner la propriété complète du répertoire .kube à Jenkins
 sudo chown -R jenkins:jenkins /var/lib/jenkins/.kube
 
