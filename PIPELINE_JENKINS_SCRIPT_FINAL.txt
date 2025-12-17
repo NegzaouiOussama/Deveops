@@ -80,11 +80,37 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 script {
+                    // Fonction pour pousser avec retry
+                    def pushWithRetry = { image, maxRetries = 3 ->
+                        def retryCount = 0
+                        def success = false
+                        while (retryCount < maxRetries && !success) {
+                            try {
+                                sh "docker push ${image}"
+                                success = true
+                                echo "✅ Successfully pushed ${image}"
+                            } catch (Exception e) {
+                                retryCount++
+                                if (retryCount < maxRetries) {
+                                    def waitTime = retryCount * 10
+                                    echo "⚠️  Failed to push ${image} (attempt ${retryCount}/${maxRetries}). Retrying in ${waitTime} seconds..."
+                                    sleep(waitTime)
+                                } else {
+                                    echo "❌ Failed to push ${image} after ${maxRetries} attempts"
+                                    throw e
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Se connecter à Docker Hub
                     sh """
                         echo ${env.DOCKER_PASSWORD} | docker login -u ${env.DOCKER_USERNAME} --password-stdin
-                        docker push ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}
-                        docker push ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest
                     """
+                    
+                    // Pousser avec retry
+                    pushWithRetry("${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}")
+                    pushWithRetry("${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest")
                 }
             }
         }
