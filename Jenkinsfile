@@ -87,6 +87,7 @@ pipeline {
                         def success = false
                         while (retryCount < maxRetries && !success) {
                             try {
+                                echo "🔄 Pushing ${image} (attempt ${retryCount + 1}/${maxRetries})..."
                                 sh "docker push ${image}"
                                 success = true
                                 echo "✅ Successfully pushed ${image}"
@@ -105,13 +106,22 @@ pipeline {
                     }
                     
                     // Se connecter à Docker Hub
+                    echo "🔐 Logging into Docker Hub..."
                     sh """
                         echo ${env.DOCKER_PASSWORD} | docker login -u ${env.DOCKER_USERNAME} --password-stdin
                     """
                     
+                    // Vérifier que l'image existe localement
+                    sh """
+                        docker images | grep ${env.DOCKER_IMAGE_NAME} | grep ${env.DOCKER_IMAGE_TAG} || echo "⚠️  Image tag ${env.DOCKER_IMAGE_TAG} not found locally"
+                    """
+                    
                     // Pousser avec retry
+                    echo "📤 Pushing images to Docker Hub..."
                     pushWithRetry("${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}")
                     pushWithRetry("${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest")
+                    
+                    echo "✅ All images pushed successfully!"
                 }
             }
         }
