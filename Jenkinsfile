@@ -281,17 +281,36 @@ pipeline {
                         echo "5️⃣  Vérification Spring Boot Actuator..."
                         # Sélectionner uniquement les pods en état Running
                         APP_POD=\$(kubectl get pod -n devops -l app=student-management --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null | head -1)
+                        NODEPORT=\$(kubectl get service student-management -n devops -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "30080")
+                        
                         if [ -n "\$APP_POD" ]; then
                             # Vérifier que le pod est vraiment ready
                             POD_READY=\$(kubectl get pod \$APP_POD -n devops -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
                             if [ "\$POD_READY" = "True" ]; then
-                                ACTUATOR_TEST=\$(kubectl exec -n devops \$APP_POD -- wget -qO- http://localhost:8089/student/actuator/prometheus 2>/dev/null | head -5 || echo "")
-                                if [ -n "\$ACTUATOR_TEST" ]; then
-                                    echo "✅ Spring Boot Actuator fonctionne (pod: \$APP_POD)"
-                                    echo "   Métriques disponibles sur: http://localhost:8089/student/actuator/prometheus"
+                                # Tester Actuator depuis l'extérieur (via NodePort) - plus fiable que exec
+                                ACTUATOR_RESPONSE=\$(curl -s -o /dev/null -w "%{http_code}" http://\${MINIKUBE_IP}:\${NODEPORT}/student/actuator/prometheus 2>/dev/null || echo "000")
+                                
+                                if [ "\$ACTUATOR_RESPONSE" = "200" ]; then
+                                    ACTUATOR_TEST=\$(curl -s http://\${MINIKUBE_IP}:\${NODEPORT}/student/actuator/prometheus 2>/dev/null | head -5 || echo "")
+                                    if [ -n "\$ACTUATOR_TEST" ] && echo "\$ACTUATOR_TEST" | grep -q "# HELP"; then
+                                        echo "✅ Spring Boot Actuator fonctionne (pod: \$APP_POD)"
+                                        echo "   Métriques disponibles sur: http://\${MINIKUBE_IP}:\${NODEPORT}/student/actuator/prometheus"
+                                        echo "   Exemple de métrique: \$(echo "\$ACTUATOR_TEST" | head -1)"
+                                    else
+                                        echo "⚠️  Actuator répond mais format inattendu (HTTP \$ACTUATOR_RESPONSE)"
+                                        echo "   Réponse: \$(echo "\$ACTUATOR_TEST" | head -3)"
+                                    fi
+                                elif [ "\$ACTUATOR_RESPONSE" = "404" ]; then
+                                    echo "⚠️  Actuator endpoint non trouvé (HTTP 404)"
+                                    echo "   Vérifiez que:"
+                                    echo "   1. Le profile 'docker' est actif (vérifiez Dockerfile)"
+                                    echo "   2. Les dépendances Actuator sont dans pom.xml"
+                                    echo "   3. application-docker.properties contient la config Actuator"
+                                    echo "   Logs du pod:"
+                                    kubectl logs \$APP_POD -n devops --tail=20 | grep -i actuator || echo "   Aucun log Actuator trouvé"
                                 else
-                                    echo "⚠️  Spring Boot Actuator pourrait ne pas être configuré (pod: \$APP_POD)"
-                                    echo "   Vérifiez les logs: kubectl logs \$APP_POD -n devops"
+                                    echo "⚠️  Actuator non accessible (HTTP \$ACTUATOR_RESPONSE)"
+                                    echo "   Pod: \$APP_POD"
                                 fi
                             else
                                 echo "⚠️  Pod \$APP_POD n'est pas en état Ready (status: \$POD_READY)"
@@ -329,11 +348,27 @@ pipeline {
                             if [ "\$JENKINS_METRICS_COUNT" -gt 0 ]; then
                                 echo "   ✅ \$JENKINS_METRICS_COUNT métriques Jenkins trouvées"
                             fi
-                        elif [ "\$JENKINS_TEST" = "302" ] || [ "\$JENKINS_TEST" = "401" ] || [ "\$JENKINS_TEST" = "403" ]; then
+                        elif [ "\$JENKINS_TEST" = "302" ]; then
+                            # Tester avec le slash final (Jenkins redirige vers /prometheus/)
+                            JENKINS_TEST_SLASH=\$(curl -s -o /dev/null -w "%{http_code}" http://\${WSL_IP}:8080/prometheus/ 2>/dev/null || echo "000")
+                            if [ "\$JENKINS_TEST_SLASH" = "200" ]; then
+                                echo "✅ Jenkins expose les métriques Prometheus (HTTP 200 sur /prometheus/)"
+                                echo "   Endpoint: http://\${WSL_IP}:8080/prometheus/"
+                                JENKINS_METRICS_COUNT=\$(curl -s http://\${WSL_IP}:8080/prometheus/ 2>/dev/null | grep -c "^jenkins_" || echo "0")
+                                if [ "\$JENKINS_METRICS_COUNT" -gt 0 ]; then
+                                    echo "   ✅ \$JENKINS_METRICS_COUNT métriques Jenkins trouvées"
+                                fi
+                            else
+                                echo "⚠️  Jenkins nécessite une authentification (HTTP \$JENKINS_TEST -> \$JENKINS_TEST_SLASH)"
+                                echo "   Le plugin Prometheus est probablement installé mais protégé"
+                                echo "   Configurez Prometheus avec authentification ou exposez l'endpoint publiquement"
+                                echo "   Endpoint: http://\${WSL_IP}:8080/prometheus/"
+                            fi
+                        elif [ "\$JENKINS_TEST" = "401" ] || [ "\$JENKINS_TEST" = "403" ]; then
                             echo "⚠️  Jenkins nécessite une authentification (HTTP \$JENKINS_TEST)"
                             echo "   Le plugin Prometheus est probablement installé mais protégé"
                             echo "   Configurez Prometheus avec authentification ou exposez l'endpoint publiquement"
-                            echo "   Endpoint: http://\${WSL_IP}:8080/prometheus"
+                            echo "   Endpoint: http://\${WSL_IP}:8080/prometheus/"
                         else
                             echo "⚠️  Jenkins ne semble pas exposer les métriques (HTTP \$JENKINS_TEST)"
                             echo "   Vérifiez que:"
