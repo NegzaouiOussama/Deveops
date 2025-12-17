@@ -26,8 +26,8 @@ data:
             action: keep
             regex: student-management
           - source_labels: [__meta_kubernetes_pod_ip]
-            action: replace
             target_label: __address__
+            regex: (.+)
             replacement: '${1}:8089'
           - source_labels: [__meta_kubernetes_pod_name]
             target_label: pod_name
@@ -68,8 +68,8 @@ data:
             action: keep
             regex: node-exporter
           - source_labels: [__meta_kubernetes_pod_ip]
-            action: replace
             target_label: __address__
+            regex: (.+)
             replacement: '${1}:9100'
           - source_labels: [__meta_kubernetes_pod_name]
             target_label: pod_name

@@ -233,6 +233,117 @@ pipeline {
                 }
             }
         }
+        
+        stage('Verify Monitoring Stack (Prometheus & Grafana)') {
+            steps {
+                script {
+                    sh """
+                        echo "========================================="
+                        echo "📊 Vérification du Monitoring Stack"
+                        echo "========================================="
+                        
+                        MINIKUBE_IP=\$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo "192.168.49.2")
+                        WSL_IP=\$(ip addr show eth0 2>/dev/null | grep "inet " | awk '{print \$2}' | cut -d/ -f1 || echo "172.29.114.102")
+                        
+                        echo ""
+                        echo "1️⃣  Vérification des pods Prometheus et Grafana..."
+                        kubectl get pods -n devops -l 'app in (prometheus,grafana,node-exporter)' || echo "Monitoring pods check"
+                        
+                        echo ""
+                        echo "2️⃣  Vérification Prometheus..."
+                        PROMETHEUS_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" http://\${MINIKUBE_IP}:30909/api/v1/status/config || echo "000")
+                        if [ "\$PROMETHEUS_STATUS" = "200" ]; then
+                            echo "✅ Prometheus est accessible (HTTP \$PROMETHEUS_STATUS)"
+                        else
+                            echo "⚠️  Prometheus pourrait ne pas être accessible (HTTP \$PROMETHEUS_STATUS)"
+                        fi
+                        
+                        echo ""
+                        echo "3️⃣  Vérification Grafana..."
+                        GRAFANA_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" http://\${MINIKUBE_IP}:30300/api/health || echo "000")
+                        if [ "\$GRAFANA_STATUS" = "200" ]; then
+                            echo "✅ Grafana est accessible (HTTP \$GRAFANA_STATUS)"
+                        else
+                            echo "⚠️  Grafana pourrait ne pas être accessible (HTTP \$GRAFANA_STATUS)"
+                        fi
+                        
+                        echo ""
+                        echo "4️⃣  Vérification des targets Prometheus..."
+                        TARGETS=\$(curl -s http://\${MINIKUBE_IP}:30909/api/v1/targets 2>/dev/null || echo "")
+                        if [ -n "\$TARGETS" ]; then
+                            echo "Targets trouvés:"
+                            echo "\$TARGETS" | grep -o '"job":"[^"]*"' | sort | uniq || echo "   Parsing targets..."
+                        else
+                            echo "⚠️  Impossible de récupérer les targets Prometheus"
+                        fi
+                        
+                        echo ""
+                        echo "5️⃣  Vérification Spring Boot Actuator..."
+                        APP_POD=\$(kubectl get pod -n devops -l app=student-management -o jsonpath='{.items[0].metadata.name}' 2>/dev/null | head -1)
+                        if [ -n "\$APP_POD" ]; then
+                            ACTUATOR_TEST=\$(kubectl exec -n devops \$APP_POD -- wget -qO- http://localhost:8089/student/actuator/prometheus 2>/dev/null | head -5 || echo "")
+                            if [ -n "\$ACTUATOR_TEST" ]; then
+                                echo "✅ Spring Boot Actuator fonctionne"
+                                echo "   Métriques disponibles sur: http://localhost:8089/student/actuator/prometheus"
+                            else
+                                echo "⚠️  Spring Boot Actuator pourrait ne pas être configuré"
+                            fi
+                        else
+                            echo "⚠️  Aucun pod de l'application trouvé pour tester Actuator"
+                        fi
+                        
+                        echo ""
+                        echo "6️⃣  Vérification Node Exporter..."
+                        NODE_EXPORTER_POD=\$(kubectl get pod -n devops -l app=node-exporter -o jsonpath='{.items[0].metadata.name}' 2>/dev/null | head -1)
+                        if [ -n "\$NODE_EXPORTER_POD" ]; then
+                            NODE_METRICS=\$(kubectl exec -n devops \$NODE_EXPORTER_POD -- wget -qO- http://localhost:9100/metrics 2>/dev/null | grep -c "node_" || echo "0")
+                            if [ "\$NODE_METRICS" -gt 0 ]; then
+                                echo "✅ Node Exporter fonctionne (\$NODE_METRICS métriques système trouvées)"
+                            else
+                                echo "⚠️  Node Exporter pourrait ne pas fonctionner"
+                            fi
+                        else
+                            echo "⚠️  Node Exporter pod non trouvé"
+                        fi
+                        
+                        echo ""
+                        echo "7️⃣  Vérification Jenkins Metrics..."
+                        JENKINS_TEST=\$(curl -s -o /dev/null -w "%{http_code}" http://\${WSL_IP}:8080/prometheus 2>/dev/null || echo "000")
+                        if [ "\$JENKINS_TEST" = "200" ]; then
+                            echo "✅ Jenkins expose les métriques Prometheus"
+                            echo "   Endpoint: http://\${WSL_IP}:8080/prometheus"
+                        else
+                            echo "⚠️  Jenkins ne semble pas exposer les métriques (HTTP \$JENKINS_TEST)"
+                            echo "   Assurez-vous que le plugin 'Prometheus metrics plugin' est installé"
+                        fi
+                        
+                        echo ""
+                        echo "========================================="
+                        echo "📊 URLs du Monitoring"
+                        echo "========================================="
+                        echo "Prometheus: http://\${MINIKUBE_IP}:30909"
+                        echo "   - Status: http://\${MINIKUBE_IP}:30909/api/v1/status/runtimeinfo"
+                        echo "   - Targets: http://\${MINIKUBE_IP}:30909/targets"
+                        echo "   - Graph: http://\${MINIKUBE_IP}:30909/graph"
+                        echo ""
+                        echo "Grafana: http://\${MINIKUBE_IP}:30300"
+                        echo "   - Login: admin / admin"
+                        echo "   - Dashboards: Automatiquement importés"
+                        echo "     * Spring Boot Application Metrics"
+                        echo "     * Jenkins Metrics"
+                        echo "     * System Metrics (Node Exporter)"
+                        echo ""
+                        echo "Spring Actuator: http://\${MINIKUBE_IP}:30080/student/actuator/prometheus"
+                        echo "Jenkins Metrics: http://\${WSL_IP}:8080/prometheus"
+                        echo ""
+                        echo "Pour accéder depuis Windows:"
+                        echo "  Terminal 1: minikube service prometheus -n devops"
+                        echo "  Terminal 2: minikube service grafana -n devops"
+                        echo "========================================="
+                    """
+                }
+            }
+        }
     }
     
     post {
@@ -253,6 +364,13 @@ pipeline {
                 echo "☸️  Kubernetes Namespace: devops"
                 echo "🌐 Application URL: http://${MINIKUBE_IP}:${NODEPORT}/student"
                 echo "📚 Swagger UI: http://${MINIKUBE_IP}:${NODEPORT}/student/swagger-ui.html"
+                echo ""
+                echo "📊 Monitoring Stack:"
+                def WSL_IP = sh(script: "ip addr show eth0 2>/dev/null | grep 'inet ' | awk '{print \$2}' | cut -d/ -f1 || echo '172.29.114.102'", returnStdout: true).trim()
+                echo "   📈 Prometheus: http://${MINIKUBE_IP}:30909"
+                echo "   📊 Grafana: http://${MINIKUBE_IP}:30300 (admin/admin)"
+                echo "   🔧 Spring Actuator: http://${MINIKUBE_IP}:${NODEPORT}/student/actuator/prometheus"
+                echo "   🏗️  Jenkins Metrics: http://${WSL_IP}:8080/prometheus"
                 echo '=========================================='
             }
         }
