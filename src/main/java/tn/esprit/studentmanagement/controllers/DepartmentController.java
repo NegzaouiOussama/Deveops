@@ -20,27 +20,27 @@ import java.nio.charset.StandardCharsets;
 public class DepartmentController {
     private IDepartmentService departmentService;
 
-    @GetMapping(value = "/getAllDepartment", produces = {MediaType.TEXT_HTML_VALUE, MediaType.APPLICATION_JSON_VALUE})
+    @GetMapping("/getAllDepartment")
     public ResponseEntity<?> getAllDepartment(
             @RequestHeader(value = "Accept", required = false) String accept,
-            @RequestParam(value = "format", required = false) String format,
-            @RequestParam(value = "json", required = false) String jsonParam) {
+            @RequestParam(value = "format", required = false) String format) {
         
-        // Si format=json ou ?json est explicitement demandé, retourner JSON
-        if ("json".equalsIgnoreCase(format) || jsonParam != null) {
+        // Si format=json est explicitement demandé, retourner JSON
+        if ("json".equalsIgnoreCase(format)) {
             return ResponseEntity.ok()
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(departmentService.getAllDepartments());
         }
         
-        // Par défaut, retourner HTML pour les navigateurs
-        // Si Accept contient explicitement application/json ET pas text/html, retourner JSON
-        boolean explicitlyWantsJson = accept != null && 
+        // Par défaut, retourner HTML (pour navigateurs)
+        // Uniquement si Accept contient explicitement "application/json" et pas "text/html"
+        boolean wantsJsonOnly = accept != null && 
             accept.contains("application/json") && 
-            !accept.contains("text/html");
+            !accept.contains("text/html") &&
+            !accept.contains("*/*");
         
-        if (!explicitlyWantsJson) {
-            // Retourner HTML par défaut (pour navigateurs)
+        if (!wantsJsonOnly) {
+            // Retourner HTML par défaut
             try {
                 Resource resource = new ClassPathResource("static/departments.html");
                 String htmlContent = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -60,7 +60,7 @@ public class DepartmentController {
             }
         }
         
-        // Pour les appels API explicites (Accept: application/json uniquement), retourner JSON
+        // Pour les appels API explicites, retourner JSON
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(departmentService.getAllDepartments());
