@@ -1,0 +1,118 @@
+{
+  "dashboard": {
+    "title": "Spring Boot Application Metrics",
+    "tags": ["spring-boot", "actuator"],
+    "timezone": "browser",
+    "schemaVersion": 27,
+    "version": 1,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "HTTP Requests Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(http_server_requests_seconds_count{application=\"student-management\"}[5m])",
+            "legendFormat": "{{uri}} - {{status}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"format": "reqps", "label": "Requests/sec"}, {"format": "short"}],
+        "xaxis": {"mode": "time"}
+      },
+      {
+        "id": 2,
+        "title": "HTTP Response Time",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_server_requests_seconds_bucket{application=\"student-management\"}[5m]))",
+            "legendFormat": "95th percentile",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(http_server_requests_seconds_bucket{application=\"student-management\"}[5m]))",
+            "legendFormat": "50th percentile",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [{"format": "s", "label": "Response Time"}, {"format": "short"}],
+        "xaxis": {"mode": "time"}
+      },
+      {
+        "id": 3,
+        "title": "JVM Memory Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "jvm_memory_used_bytes{application=\"student-management\", area=\"heap\"}",
+            "legendFormat": "{{id}}",
+            "refId": "A"
+          },
+          {
+            "expr": "jvm_memory_max_bytes{application=\"student-management\", area=\"heap\"}",
+            "legendFormat": "{{id}} (max)",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [{"format": "bytes", "label": "Memory"}, {"format": "short"}],
+        "xaxis": {"mode": "time"}
+      },
+      {
+        "id": 4,
+        "title": "Active Threads",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "jvm_threads_live_threads{application=\"student-management\"}",
+            "legendFormat": "Active Threads",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"format": "short", "label": "Threads"}, {"format": "short"}],
+        "xaxis": {"mode": "time"}
+      },
+      {
+        "id": 5,
+        "title": "Database Connections",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "hikari_connections_active{application=\"student-management\"}",
+            "legendFormat": "Active Connections",
+            "refId": "A"
+          },
+          {
+            "expr": "hikari_connections_idle{application=\"student-management\"}",
+            "legendFormat": "Idle Connections",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [{"format": "short", "label": "Connections"}, {"format": "short"}],
+        "xaxis": {"mode": "time"}
+      },
+      {
+        "id": 6,
+        "title": "Pod CPU Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{namespace=\"devops\", pod=~\"student-management-.*\"}[5m])",
+            "legendFormat": "{{pod}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"format": "percentunit", "label": "CPU Usage"}, {"format": "short"}],
+        "xaxis": {"mode": "time"}
+      }
+    ]
+  }
+}
+

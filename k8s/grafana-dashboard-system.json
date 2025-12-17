@@ -1,0 +1,123 @@
+{
+  "dashboard": {
+    "title": "System Metrics (Node Exporter)",
+    "tags": ["system", "node-exporter"],
+    "timezone": "browser",
+    "schemaVersion": 27,
+    "version": 1,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "CPU Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "CPU Usage %",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"format": "percent", "label": "CPU %", "max": 100}, {"format": "short"}],
+        "xaxis": {"mode": "time"}
+      },
+      {
+        "id": 2,
+        "title": "Memory Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
+            "legendFormat": "Used",
+            "refId": "A"
+          },
+          {
+            "expr": "node_memory_MemTotal_bytes",
+            "legendFormat": "Total",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [{"format": "bytes", "label": "Memory"}, {"format": "short"}],
+        "xaxis": {"mode": "time"}
+      },
+      {
+        "id": 3,
+        "title": "Disk I/O",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(node_disk_io_time_seconds_total[5m])",
+            "legendFormat": "{{device}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"format": "short", "label": "I/O Time"}, {"format": "short"}],
+        "xaxis": {"mode": "time"}
+      },
+      {
+        "id": 4,
+        "title": "Network Traffic",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(node_network_receive_bytes_total[5m])",
+            "legendFormat": "{{device}} - Receive",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(node_network_transmit_bytes_total[5m])",
+            "legendFormat": "{{device}} - Transmit",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [{"format": "Bps", "label": "Traffic"}, {"format": "short"}],
+        "xaxis": {"mode": "time"}
+      },
+      {
+        "id": 5,
+        "title": "Load Average",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "node_load1",
+            "legendFormat": "1m",
+            "refId": "A"
+          },
+          {
+            "expr": "node_load5",
+            "legendFormat": "5m",
+            "refId": "B"
+          },
+          {
+            "expr": "node_load15",
+            "legendFormat": "15m",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [{"format": "short", "label": "Load"}, {"format": "short"}],
+        "xaxis": {"mode": "time"}
+      },
+      {
+        "id": 6,
+        "title": "Disk Space Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "100 - ((node_filesystem_avail_bytes{mountpoint=\"/\"} * 100) / node_filesystem_size_bytes{mountpoint=\"/\"})",
+            "legendFormat": "Disk Used %",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"format": "percent", "label": "Disk %", "max": 100}, {"format": "short"}],
+        "xaxis": {"mode": "time"}
+      }
+    ]
+  }
+}
+

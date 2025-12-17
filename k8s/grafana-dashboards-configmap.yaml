@@ -1,0 +1,327 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-content
+  namespace: devops
+data:
+  springboot.json: |
+    {
+      "dashboard": {
+        "title": "Spring Boot Application Metrics",
+        "tags": ["spring-boot", "actuator"],
+        "timezone": "browser",
+        "schemaVersion": 27,
+        "version": 1,
+        "refresh": "10s",
+        "panels": [
+          {
+            "id": 1,
+            "title": "HTTP Requests Rate",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "rate(http_server_requests_seconds_count{application=\"student-management\"}[5m])",
+                "legendFormat": "{{uri}} - {{status}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [{"format": "reqps", "label": "Requests/sec"}, {"format": "short"}],
+            "xaxis": {"mode": "time"}
+          },
+          {
+            "id": 2,
+            "title": "HTTP Response Time (95th percentile)",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(http_server_requests_seconds_bucket{application=\"student-management\"}[5m]))",
+                "legendFormat": "95th percentile",
+                "refId": "A"
+              },
+              {
+                "expr": "histogram_quantile(0.50, rate(http_server_requests_seconds_bucket{application=\"student-management\"}[5m]))",
+                "legendFormat": "50th percentile",
+                "refId": "B"
+              }
+            ],
+            "yaxes": [{"format": "s", "label": "Response Time"}, {"format": "short"}],
+            "xaxis": {"mode": "time"}
+          },
+          {
+            "id": 3,
+            "title": "JVM Memory Usage",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "jvm_memory_used_bytes{application=\"student-management\", area=\"heap\"} / 1024 / 1024",
+                "legendFormat": "{{id}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [{"format": "mbytes", "label": "Memory (MB)"}, {"format": "short"}],
+            "xaxis": {"mode": "time"}
+          },
+          {
+            "id": 4,
+            "title": "Active Threads",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "jvm_threads_live_threads{application=\"student-management\"}",
+                "legendFormat": "Active Threads",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [{"format": "short", "label": "Threads"}, {"format": "short"}],
+            "xaxis": {"mode": "time"}
+          },
+          {
+            "id": 5,
+            "title": "Database Connections",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "hikari_connections_active{application=\"student-management\"}",
+                "legendFormat": "Active Connections",
+                "refId": "A"
+              },
+              {
+                "expr": "hikari_connections_idle{application=\"student-management\"}",
+                "legendFormat": "Idle Connections",
+                "refId": "B"
+              }
+            ],
+            "yaxes": [{"format": "short", "label": "Connections"}, {"format": "short"}],
+            "xaxis": {"mode": "time"}
+          },
+          {
+            "id": 6,
+            "title": "CPU Usage",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+            "targets": [
+              {
+                "expr": "process_cpu_usage{application=\"student-management\"} * 100",
+                "legendFormat": "CPU Usage %",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [{"format": "percent", "label": "CPU %"}, {"format": "short"}],
+            "xaxis": {"mode": "time"}
+          }
+        ]
+      }
+    }
+  jenkins.json: |
+    {
+      "dashboard": {
+        "title": "Jenkins Metrics",
+        "tags": ["jenkins", "ci-cd"],
+        "timezone": "browser",
+        "schemaVersion": 27,
+        "version": 1,
+        "refresh": "30s",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Builds Rate",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "rate(jenkins_builds_total[5m])",
+                "legendFormat": "{{result}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [{"format": "ops", "label": "Builds/min"}]
+          },
+          {
+            "id": 2,
+            "title": "Build Success Rate",
+            "type": "gauge",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "(sum(rate(jenkins_builds_total{result=\"SUCCESS\"}[5m])) / sum(rate(jenkins_builds_total[5m]))) * 100",
+                "legendFormat": "Success Rate",
+                "refId": "A"
+              }
+            ],
+            "options": {"min": 0, "max": 100},
+            "fieldConfig": {"defaults": {"unit": "percent", "decimals": 2}}
+          },
+          {
+            "id": 3,
+            "title": "Build Duration",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "jenkins_job_last_build_duration_seconds",
+                "legendFormat": "{{job}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [{"format": "s", "label": "Duration"}]
+          },
+          {
+            "id": 4,
+            "title": "Total Builds",
+            "type": "stat",
+            "gridPos": {"h": 4, "w": 6, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(jenkins_builds_total)",
+                "legendFormat": "Total",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 5,
+            "title": "Failed Builds",
+            "type": "stat",
+            "gridPos": {"h": 4, "w": 6, "x": 6, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(jenkins_builds_total{result=\"FAILURE\"})",
+                "legendFormat": "Failed",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 6,
+            "title": "Active Executors",
+            "type": "stat",
+            "gridPos": {"h": 4, "w": 6, "x": 12, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(jenkins_executor_count_value)",
+                "legendFormat": "Executors",
+                "refId": "A"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  system.json: |
+    {
+      "dashboard": {
+        "title": "System Metrics (Node Exporter)",
+        "tags": ["system", "node-exporter"],
+        "timezone": "browser",
+        "schemaVersion": 27,
+        "version": 1,
+        "refresh": "10s",
+        "panels": [
+          {
+            "id": 1,
+            "title": "CPU Usage",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+                "legendFormat": "CPU Usage",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [{"format": "percent", "label": "CPU %"}]
+          },
+          {
+            "id": 2,
+            "title": "Memory Usage",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
+                "legendFormat": "Memory Used %",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [{"format": "percent", "label": "Memory %"}]
+          },
+          {
+            "id": 3,
+            "title": "Disk Usage",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "100 - ((node_filesystem_avail_bytes{mountpoint=\"/\"} * 100) / node_filesystem_size_bytes{mountpoint=\"/\"})",
+                "legendFormat": "Disk Used %",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [{"format": "percent", "label": "Disk %"}]
+          },
+          {
+            "id": 4,
+            "title": "Network Traffic",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "rate(node_network_receive_bytes_total[5m]) / 1024 / 1024",
+                "legendFormat": "{{device}} - Receive",
+                "refId": "A"
+              },
+              {
+                "expr": "rate(node_network_transmit_bytes_total[5m]) / 1024 / 1024",
+                "legendFormat": "{{device}} - Transmit",
+                "refId": "B"
+              }
+            ],
+            "yaxes": [{"format": "mbytes", "label": "MB/s"}]
+          },
+          {
+            "id": 5,
+            "title": "Load Average",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "node_load1",
+                "legendFormat": "1 min",
+                "refId": "A"
+              },
+              {
+                "expr": "node_load5",
+                "legendFormat": "5 min",
+                "refId": "B"
+              },
+              {
+                "expr": "node_load15",
+                "legendFormat": "15 min",
+                "refId": "C"
+              }
+            ],
+            "yaxes": [{"format": "short", "label": "Load"}]
+          },
+          {
+            "id": 6,
+            "title": "Disk I/O",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+            "targets": [
+              {
+                "expr": "rate(node_disk_io_time_seconds_total[5m])",
+                "legendFormat": "{{device}}",
+                "refId": "A"
+              }
+            ],
+            "yaxes": [{"format": "short", "label": "I/O Time"}]
+          }
+        ]
+      }
+    }
+

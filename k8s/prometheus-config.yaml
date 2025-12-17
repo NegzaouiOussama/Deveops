@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: devops
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'minikube'
+        environment: 'dev'
+
+    scrape_configs:
+      # Spring Boot Application Metrics
+      - job_name: 'spring-boot-app'
+        metrics_path: '/student/actuator/prometheus'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - devops
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: student-management
+          - source_labels: [__meta_kubernetes_pod_ip]
+            action: replace
+            target_label: __address__
+            replacement: '${1}:8089'
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod_name
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+
+      # Jenkins Metrics
+      # Note: Jenkins doit avoir le plugin Prometheus installé
+      # L'endpoint des métriques est: http://jenkins-url/prometheus
+      - job_name: 'jenkins'
+        static_configs:
+          # Essayer host.docker.internal d'abord (fonctionne avec Docker driver)
+          - targets: ['host.docker.internal:8080']
+            labels:
+              job: 'jenkins'
+              service: 'jenkins'
+              environment: 'dev'
+          # Fallback: utiliser l'IP de la machine hôte (remplacer par votre IP WSL)
+          # Pour trouver l'IP WSL: ip addr show eth0 | grep "inet " | awk '{print $2}' | cut -d/ -f1
+          - targets: ['172.29.114.102:8080']
+            labels:
+              job: 'jenkins'
+              service: 'jenkins'
+              environment: 'dev'
+        metrics_path: '/prometheus'
+        scrape_interval: 30s
+        scrape_timeout: 10s
+
+      # Node Exporter - Métriques système
+      - job_name: 'node-exporter'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - devops
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: node-exporter
+          - source_labels: [__meta_kubernetes_pod_ip]
+            action: replace
+            target_label: __address__
+            replacement: '${1}:9100'
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod_name
+
+      # Prometheus lui-même
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+            labels:
+              job: 'prometheus'
+

@@ -1,0 +1,133 @@
+{
+  "dashboard": {
+    "title": "DevOps Complete Monitoring",
+    "tags": ["devops", "complete", "monitoring"],
+    "timezone": "browser",
+    "schemaVersion": 27,
+    "version": 1,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "🚀 Application - HTTP Requests Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "rate(http_server_requests_seconds_count{application=\"student-management\"}[5m])",
+            "legendFormat": "{{uri}} - {{status}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"format": "reqps", "label": "Requests/sec"}, {"format": "short"}]
+      },
+      {
+        "id": 2,
+        "title": "⚙️ System - CPU Usage (%)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "CPU Usage",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"format": "percent", "label": "CPU %"}, {"format": "short"}]
+      },
+      {
+        "id": 3,
+        "title": "💾 Application - JVM Memory",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "jvm_memory_used_bytes{application=\"student-management\", area=\"heap\"} / 1024 / 1024",
+            "legendFormat": "{{id}} (used)",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"format": "mbytes", "label": "Memory (MB)"}, {"format": "short"}]
+      },
+      {
+        "id": 4,
+        "title": "💾 System - Memory Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
+            "legendFormat": "Memory Used %",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"format": "percent", "label": "Memory %"}, {"format": "short"}]
+      },
+      {
+        "id": 5,
+        "title": "🔨 Jenkins - Builds Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(jenkins_builds_total[5m])",
+            "legendFormat": "{{result}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"format": "ops", "label": "Builds/min"}, {"format": "short"}]
+      },
+      {
+        "id": 6,
+        "title": "🔨 Jenkins - Build Success Rate",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "(sum(rate(jenkins_builds_total{result=\"SUCCESS\"}[5m])) / sum(rate(jenkins_builds_total[5m]))) * 100",
+            "legendFormat": "Success Rate",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "min": 0,
+          "max": 100
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "📊 Application - Response Time (95th percentile)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_server_requests_seconds_bucket{application=\"student-management\"}[5m]))",
+            "legendFormat": "95th percentile",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"format": "s", "label": "Response Time"}, {"format": "short"}]
+      },
+      {
+        "id": 8,
+        "title": "💿 System - Disk Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "100 - ((node_filesystem_avail_bytes{mountpoint=\"/\"} * 100) / node_filesystem_size_bytes{mountpoint=\"/\"})",
+            "legendFormat": "Disk Used %",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [{"format": "percent", "label": "Disk %"}, {"format": "short"}]
+      }
+    ]
+  }
+}
+
