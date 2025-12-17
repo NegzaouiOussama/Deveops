@@ -1,15 +1,18 @@
 # Stage 1: Build
+# Cache invalidation: Update this comment when dependencies change
 FROM maven:3.9.6-eclipse-temurin-17 AS build
 
 WORKDIR /app
 
-# Copy pom.xml and download dependencies
+# Copy pom.xml first (for better caching)
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
+# Force download of dependencies (invalidate cache if pom.xml changes)
+RUN mvn dependency:go-offline -B -U
 
 # Copy source code and build
 COPY src ./src
-RUN mvn clean package -DskipTests
+# Force rebuild without using cache for dependencies
+RUN mvn clean package -DskipTests -U
 
 # Stage 2: Runtime
 FROM eclipse-temurin:17-jre-alpine
