@@ -134,3 +134,4 @@ Si vous obtenez une erreur de connexion, vérifiez que :
 2. L'application est déployée et fonctionne : `kubectl get pods -n devops`
 3. Les logs de l'application : `kubectl logs -l app=student-management -n devops --tail=50`
 
+

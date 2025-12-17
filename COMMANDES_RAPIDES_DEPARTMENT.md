@@ -62,3 +62,4 @@ curl -X POST http://127.0.0.1:41607/student/Department/createDepartment -H "Cont
 curl http://127.0.0.1:41607/student/Department/getAllDepartment | jq .
 ```
 
+
