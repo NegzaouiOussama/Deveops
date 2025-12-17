@@ -12,6 +12,7 @@ import tn.esprit.studentmanagement.services.IDepartmentService;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @RestController
 @RequestMapping("/Department")
@@ -20,26 +21,37 @@ import java.nio.charset.StandardCharsets;
 public class DepartmentController {
     private IDepartmentService departmentService;
 
-    @GetMapping(value = "/getAllDepartment", produces = {MediaType.APPLICATION_JSON_VALUE, MediaType.TEXT_HTML_VALUE})
-    public ResponseEntity<?> getAllDepartment(@RequestHeader(value = "Accept", defaultValue = "*/*") String accept) {
-        // Si la requête accepte HTML (navigateur) et ne demande pas explicitement JSON, retourner la page HTML
-        if (accept.contains("text/html") && !accept.contains("application/json")) {
+    @GetMapping("/getAllDepartment")
+    public ResponseEntity<?> getAllDepartment(
+            @RequestHeader(value = "Accept", required = false) String accept,
+            @RequestParam(value = "format", required = false) String format) {
+        
+        // Si format=json est explicitement demandé, retourner JSON
+        if ("json".equalsIgnoreCase(format)) {
+            return ResponseEntity.ok(departmentService.getAllDepartments());
+        }
+        
+        // Si c'est une requête de navigateur (contient text/html ou pas d'Accept spécifique)
+        // Retourner la page HTML
+        if (accept == null || accept.contains("text/html") || accept.equals("*/*")) {
             try {
                 Resource resource = new ClassPathResource("static/departments.html");
                 String htmlContent = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
                 
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.TEXT_HTML);
+                headers.setCacheControl("no-cache");
                 
                 return ResponseEntity.ok()
                         .headers(headers)
                         .body(htmlContent);
             } catch (IOException e) {
-                // Si le fichier HTML n'existe pas, retourner JSON par défaut
+                // Si le fichier HTML n'existe pas, retourner JSON
                 return ResponseEntity.ok(departmentService.getAllDepartments());
             }
         }
-        // Sinon, retourner JSON (pour les appels API)
+        
+        // Pour les appels API explicites (Accept: application/json), retourner JSON
         return ResponseEntity.ok(departmentService.getAllDepartments());
     }
 
