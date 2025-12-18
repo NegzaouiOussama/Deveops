@@ -117,7 +117,31 @@ pipeline {
             }
         }
         
-        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    echo "🐳 Building NEW Docker image..."
+                    echo "   Image: ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}"
+                    echo "   Tag: ${env.BUILD_NUMBER} (unique pour chaque build)"
+                    echo "   Build avec --no-cache pour inclure toutes les dépendances (notamment Actuator)"
+                    
+                    sh """
+                        # Build without cache to ensure Actuator dependencies are included
+                        # Chaque build crée une NOUVELLE image avec un tag unique (BUILD_NUMBER)
+                        echo "🔨 Démarrage du build Docker..."
+                        docker build --no-cache -t ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} .
+                        
+                        echo "🏷️  Tagging de l'image..."
+                        docker tag ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest
+                        
+                        echo "✅ Image Docker créée avec succès:"
+                        docker images | grep ${env.DOCKER_IMAGE_NAME} | grep -E "${env.DOCKER_IMAGE_TAG}|latest" | head -2
+                    """
+                    
+                    echo "✅ Nouvelle image Docker créée: ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}"
+                }
+            }
+        }
         
         stage('Push Docker Image') {
             steps {
@@ -332,6 +356,8 @@ pipeline {
         stage('Deploy Monitoring Stack (Prometheus & Grafana)') {
             steps {
                 script {
+                    // Cette étape est critique pour le monitoring - continuer même en cas d'erreurs précédentes
+                    try {
                     sh """
                         echo "========================================="
                         echo "🚀 Déploiement du Monitoring Stack"
@@ -384,6 +410,11 @@ pipeline {
                         echo "✅ Monitoring Stack déployé !"
                         echo "========================================="
                     """
+                    } catch (Exception e) {
+                        echo "⚠️  Erreur lors du déploiement du Monitoring Stack: ${e.getMessage()}"
+                        echo "   Le pipeline continue malgré cette erreur..."
+                        // Ne pas faire échouer le pipeline à cause du monitoring
+                    }
                 }
             }
         }
