@@ -117,31 +117,7 @@ pipeline {
             }
         }
         
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    echo "🐳 Building NEW Docker image..."
-                    echo "   Image: ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}"
-                    echo "   Tag: ${env.BUILD_NUMBER} (unique pour chaque build)"
-                    echo "   Build avec --no-cache pour inclure toutes les dépendances (notamment Actuator)"
-                    
-                    sh """
-                        # Build without cache to ensure Actuator dependencies are included
-                        # Chaque build crée une NOUVELLE image avec un tag unique (BUILD_NUMBER)
-                        echo "🔨 Démarrage du build Docker..."
-                        docker build --no-cache -t ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} .
-                        
-                        echo "🏷️  Tagging de l'image..."
-                        docker tag ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest
-                        
-                        echo "✅ Image Docker créée avec succès:"
-                        docker images | grep ${env.DOCKER_IMAGE_NAME} | grep -E "${env.DOCKER_IMAGE_TAG}|latest" | head -2
-                    """
-                    
-                    echo "✅ Nouvelle image Docker créée: ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}"
-                }
-            }
-        }
+        
         
         stage('Push Docker Image') {
             steps {
@@ -254,7 +230,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                        kubectl wait --for=condition=ready pod -l app=mysql -n devops --timeout=300s || true
+                        kubectl wait --for=condition=ready pod -l app=mysql -n devops --timeout=10s || true
                         echo "MySQL deployment completed!"
                     """
                 }
@@ -348,6 +324,64 @@ pipeline {
                         
                         echo "=== Describing Pods ==="
                         kubectl describe pods -l app=student-management -n devops | head -50 || echo "Describe completed"
+                    """
+                }
+            }
+        }
+        
+        stage('Deploy Monitoring Stack (Prometheus & Grafana)') {
+            steps {
+                script {
+                    sh """
+                        echo "========================================="
+                        echo "🚀 Déploiement du Monitoring Stack"
+                        echo "========================================="
+                        
+                        # Détecter l'IP WSL pour la configuration Prometheus
+                        WSL_IP=\$(ip addr show eth0 2>/dev/null | grep "inet " | awk '{print \$2}' | cut -d/ -f1 || echo "172.29.114.102")
+                        echo "📡 IP WSL détectée: \$WSL_IP"
+                        
+                        # Mettre à jour la configuration Prometheus avec l'IP WSL
+                        if [ -f k8s/prometheus-config.yaml ]; then
+                            sed -i "s|172\.29\.114\.102:8080|\${WSL_IP}:8080|g" k8s/prometheus-config.yaml 2>/dev/null || true
+                            sed -i "s|172\.29\.114\.102:9100|\${WSL_IP}:9100|g" k8s/prometheus-config.yaml 2>/dev/null || true
+                            echo "✅ Configuration Prometheus mise à jour avec IP WSL: \$WSL_IP"
+                        fi
+                        
+                        echo ""
+                        echo "1️⃣  Déploiement de Node Exporter (métriques système)..."
+                        kubectl apply -f k8s/node-exporter-deployment.yaml || echo "Node Exporter déjà déployé"
+                        
+                        # Démarrer Node Exporter WSL si disponible
+                        if systemctl is-available --quiet node_exporter.service 2>/dev/null; then
+                            echo "   🔄 Démarrage de Node Exporter WSL..."
+                            sudo systemctl start node_exporter 2>/dev/null || echo "   ⚠️  Node Exporter WSL nécessite sudo"
+                        fi
+                        
+                        echo ""
+                        echo "2️⃣  Déploiement de Prometheus..."
+                        kubectl apply -f k8s/prometheus-config.yaml
+                        kubectl apply -f k8s/prometheus-deployment.yaml
+                        kubectl apply -f k8s/prometheus-service.yaml
+                        
+                        echo ""
+                        echo "3️⃣  Déploiement de Grafana..."
+                        kubectl apply -f k8s/grafana-datasources.yaml
+                        kubectl apply -f k8s/grafana-dashboards.yaml
+                        kubectl apply -f k8s/grafana-dashboards-configmap.yaml
+                        kubectl apply -f k8s/grafana-deployment.yaml
+                        kubectl apply -f k8s/grafana-service.yaml
+                        
+                        echo ""
+                        echo "4️⃣  Attente que les pods soient prêts..."
+                        sleep 15
+                        kubectl wait --for=condition=ready pod -l app=prometheus -n devops --timeout=120s || echo "Prometheus en cours de démarrage..."
+                        kubectl wait --for=condition=ready pod -l app=grafana -n devops --timeout=120s || echo "Grafana en cours de démarrage..."
+                        kubectl wait --for=condition=ready pod -l app=node-exporter -n devops --timeout=60s || echo "Node Exporter en cours de démarrage..."
+                        
+                        echo ""
+                        echo "✅ Monitoring Stack déployé !"
+                        echo "========================================="
                     """
                 }
             }

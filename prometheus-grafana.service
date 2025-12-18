@@ -1,0 +1,17 @@
+[Unit]
+Description=Prometheus and Grafana Auto Start Service
+After=network.target minikube.service
+Wants=minikube.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=%USER%
+WorkingDirectory=%HOME%/Documents/GitHub/Deveops
+ExecStart=/bin/bash %HOME%/Documents/GitHub/Deveops/start-prometheus-grafana.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+
