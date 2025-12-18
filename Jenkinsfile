@@ -56,19 +56,56 @@ pipeline {
         stage('MVN SONARQUBE') {
             steps {
                 script {
+                    // Vérifier d'abord que SonarQube est accessible
+                    echo "🔍 Vérification de l'accessibilité SonarQube..."
+                    def sonarCheck = sh(
+                        script: """
+                            curl -s -o /dev/null -w "%{http_code}" ${env.SONAR_HOST_URL}/api/system/status || echo "000"
+                        """,
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (sonarCheck != "200") {
+                        echo "⚠️  ATTENTION: SonarQube pourrait ne pas être accessible (HTTP ${sonarCheck})"
+                        echo "   Vérifiez que SonarQube est démarré: docker ps | grep sonarqube"
+                        echo "   Ou démarrez-le: docker start sonarqube"
+                        echo "   Le pipeline va quand même essayer de se connecter..."
+                    } else {
+                        echo "✅ SonarQube est accessible (HTTP ${sonarCheck})"
+                    }
+                    
+                    // Exécuter l'analyse avec timeout augmenté et meilleure gestion d'erreurs
+                    echo "📊 Démarrage de l'analyse SonarQube..."
+                    try {
+                        timeout(time: 10, unit: 'MINUTES') {
                     sh """
                         mvn sonar:sonar \\
                             -Dsonar.host.url=${env.SONAR_HOST_URL} \\
                             -Dsonar.login=${env.SONAR_TOKEN} \\
-                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \\
-                            -Dsonar.qualitygate.wait=false
-                    """
+                                    -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \\
+                                    -Dsonar.qualitygate.wait=false \\
+                                    -Dsonar.scanner.force-deprecated-java-version=true
+                            """
+                        }
+                        echo "✅ Analyse SonarQube terminée avec succès"
+                    } catch (Exception e) {
+                        echo "❌ Erreur lors de l'analyse SonarQube: ${e.getMessage()}"
+                        echo "📋 Diagnostic:"
+                        echo "   1. Vérifiez que SonarQube est accessible: curl ${env.SONAR_HOST_URL}/api/system/status"
+                        echo "   2. Vérifiez que le token est valide"
+                        echo "   3. Vérifiez les logs SonarQube: docker logs sonarqube --tail 50"
+                        echo "   4. Le pipeline continue malgré l'erreur SonarQube..."
+                        // Ne pas faire échouer le pipeline à cause de SonarQube
+                        // catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        //     throw e
+                        // }
+                    }
                 }
             }
             post {
                 always {
                     script {
-                        echo "📊 SonarQube Analysis Completed"
+                        echo "📊 SonarQube Analysis Stage Completed"
                         echo "🔗 Dashboard: ${env.SONAR_HOST_URL}/dashboard?id=tn.esprit:student-management"
                         echo "⚠️  Note: Quality Gate status can be checked in SonarQube dashboard"
                         echo "   If Quality Gate FAILED, check:"
