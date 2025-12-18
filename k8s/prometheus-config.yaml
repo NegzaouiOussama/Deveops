@@ -14,25 +14,18 @@ data:
 
     scrape_configs:
       # Spring Boot Application Metrics
+      # Configuration statique utilisant le service Kubernetes interne
       - job_name: 'spring-boot-app'
         metrics_path: '/student/actuator/prometheus'
-        kubernetes_sd_configs:
-          - role: pod
-            namespaces:
-              names:
-                - devops
-        relabel_configs:
-          - source_labels: [__meta_kubernetes_pod_label_app]
-            action: keep
-            regex: student-management
-          - source_labels: [__meta_kubernetes_pod_ip]
-            target_label: __address__
-            regex: (.+)
-            replacement: '${1}:8089'
-          - source_labels: [__meta_kubernetes_pod_name]
-            target_label: pod_name
-          - source_labels: [__meta_kubernetes_namespace]
-            target_label: namespace
+        static_configs:
+          # Utiliser le service Kubernetes interne (fonctionne toujours)
+          - targets: ['student-management.devops.svc.cluster.local:8089']
+            labels:
+              job: 'spring-boot-app'
+              service: 'student-management'
+              namespace: 'devops'
+        scrape_interval: 15s
+        scrape_timeout: 10s
 
       # Jenkins Metrics
       # Note: Jenkins doit avoir le plugin Prometheus installé
