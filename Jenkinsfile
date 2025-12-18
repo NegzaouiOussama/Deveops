@@ -83,11 +83,25 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
+                    echo "🐳 Building NEW Docker image..."
+                    echo "   Image: ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}"
+                    echo "   Tag: ${env.BUILD_NUMBER} (unique pour chaque build)"
+                    echo "   Build avec --no-cache pour inclure toutes les dépendances (notamment Actuator)"
+                    
                     sh """
                         # Build without cache to ensure Actuator dependencies are included
+                        # Chaque build crée une NOUVELLE image avec un tag unique (BUILD_NUMBER)
+                        echo "🔨 Démarrage du build Docker..."
                         docker build --no-cache -t ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} .
+                        
+                        echo "🏷️  Tagging de l'image..."
                         docker tag ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest
+                        
+                        echo "✅ Image Docker créée avec succès:"
+                        docker images | grep ${env.DOCKER_IMAGE_NAME} | grep -E "${env.DOCKER_IMAGE_TAG}|latest" | head -2
                     """
+                    
+                    echo "✅ Nouvelle image Docker créée: ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}"
                 }
             }
         }
@@ -95,6 +109,10 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 script {
+                    echo "📤 Pushing NEW Docker image to Docker Hub..."
+                    echo "   Image tag: ${env.DOCKER_IMAGE_TAG} (Build #${env.BUILD_NUMBER})"
+                    echo "   Image: ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}"
+                    
                     // Se connecter à Docker Hub
                     echo "🔐 Logging into Docker Hub..."
                     sh """
@@ -102,14 +120,18 @@ pipeline {
                     """
                     
                     // Vérifier que l'image existe localement
-                    echo "🔍 Vérification des images locales..."
+                    echo "🔍 Vérification que la nouvelle image existe localement..."
                     sh """
+                        echo "Images locales disponibles:"
                         docker images | grep ${env.DOCKER_IMAGE_NAME} | head -5
+                        echo ""
+                        echo "Vérification de l'image tag ${env.DOCKER_IMAGE_TAG}..."
                         docker images | grep ${env.DOCKER_IMAGE_NAME} | grep ${env.DOCKER_IMAGE_TAG} || (echo "❌ Image tag ${env.DOCKER_IMAGE_TAG} not found locally" && exit 1)
+                        echo "✅ Image tag ${env.DOCKER_IMAGE_TAG} trouvée localement"
                     """
                     
                     // Pousser les images avec retry explicite
-                    echo "📤 Pushing images to Docker Hub..."
+                    echo "📤 Pushing new image to Docker Hub..."
                     
                     // Push tag BUILD_NUMBER avec retry
                     def pushSuccess1 = false
@@ -158,6 +180,11 @@ pipeline {
                     }
                     
                     echo "✅ All images pushed successfully to Docker Hub!"
+                    echo ""
+                    echo "📊 RÉSUMÉ DU PUSH:"
+                    echo "   ✅ Nouvelle image poussée: ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}"
+                    echo "   ✅ Tag latest mis à jour: ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest"
+                    echo "   🔗 Docker Hub: https://hub.docker.com/r/${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}"
                 }
             }
         }
