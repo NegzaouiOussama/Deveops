@@ -25,22 +25,8 @@ public class DepartmentController {
             @RequestHeader(value = "Accept", required = false) String accept,
             @RequestParam(value = "format", required = false) String format) {
         
-        // Si format=json est explicitement demandé, retourner JSON
-        if ("json".equalsIgnoreCase(format)) {
-            return ResponseEntity.ok()
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(departmentService.getAllDepartments());
-        }
-        
-        // Par défaut, retourner HTML (pour navigateurs)
-        // Uniquement si Accept contient explicitement "application/json" et pas "text/html"
-        boolean wantsJsonOnly = accept != null && 
-            accept.contains("application/json") && 
-            !accept.contains("text/html") &&
-            !accept.contains("*/*");
-        
-        if (!wantsJsonOnly) {
-            // Retourner HTML par défaut
+        // Si format=html est explicitement demandé, retourner HTML
+        if ("html".equalsIgnoreCase(format)) {
             try {
                 Resource resource = new ClassPathResource("static/departments.html");
                 String htmlContent = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -60,7 +46,35 @@ public class DepartmentController {
             }
         }
         
-        // Pour les appels API explicites, retourner JSON
+        // Par défaut, retourner JSON pour les appels API
+        // Uniquement si Accept contient explicitement "text/html" et pas "application/json"
+        boolean wantsHtmlOnly = accept != null && 
+            accept.contains("text/html") && 
+            !accept.contains("application/json") &&
+            !accept.contains("*/*");
+        
+        if (wantsHtmlOnly) {
+            // Retourner HTML uniquement si explicitement demandé
+            try {
+                Resource resource = new ClassPathResource("static/departments.html");
+                String htmlContent = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.TEXT_HTML);
+                headers.setCacheControl("no-cache, no-store, must-revalidate");
+                
+                return ResponseEntity.ok()
+                        .headers(headers)
+                        .body(htmlContent);
+            } catch (IOException e) {
+                // Si le fichier HTML n'existe pas, retourner JSON
+                return ResponseEntity.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(departmentService.getAllDepartments());
+            }
+        }
+        
+        // Par défaut, retourner JSON pour les appels API
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(departmentService.getAllDepartments());
