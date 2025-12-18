@@ -80,17 +80,17 @@ pipeline {
             }
         }
         
-            stage('Build Docker Image') {
-                steps {
-                    script {
-                        sh """
-                            # Build without cache to ensure Actuator dependencies are included
-                            docker build --no-cache -t ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} .
-                            docker tag ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest
-                        """
-                    }
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh """
+                        # Build without cache to ensure Actuator dependencies are included
+                        docker build --no-cache -t ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} .
+                        docker tag ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest
+                    """
                 }
             }
+        }
         
         stage('Push Docker Image') {
             steps {
