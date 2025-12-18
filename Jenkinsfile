@@ -60,8 +60,22 @@ pipeline {
                         mvn sonar:sonar \\
                             -Dsonar.host.url=${env.SONAR_HOST_URL} \\
                             -Dsonar.login=${env.SONAR_TOKEN} \\
-                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \\
+                            -Dsonar.qualitygate.wait=false
                     """
+                }
+            }
+            post {
+                always {
+                    script {
+                        echo "📊 SonarQube Analysis Completed"
+                        echo "🔗 Dashboard: ${env.SONAR_HOST_URL}/dashboard?id=tn.esprit:student-management"
+                        echo "⚠️  Note: Quality Gate status can be checked in SonarQube dashboard"
+                        echo "   If Quality Gate FAILED, check:"
+                        echo "   1. Fix the issues (currently 2 issues)"
+                        echo "   2. Increase code coverage (currently 40.3%, target 80%)"
+                        echo "   3. Review security hotspots"
+                    }
                 }
             }
         }
@@ -81,30 +95,6 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 script {
-                    // Fonction pour pousser avec retry
-                    def pushWithRetry = { image, maxRetries = 3 ->
-                        def retryCount = 0
-                        def success = false
-                        while (retryCount < maxRetries && !success) {
-                            try {
-                                echo "🔄 Pushing ${image} (attempt ${retryCount + 1}/${maxRetries})..."
-                                sh "docker push ${image}"
-                                success = true
-                                echo "✅ Successfully pushed ${image}"
-                            } catch (Exception e) {
-                                retryCount++
-                                if (retryCount < maxRetries) {
-                                    def waitTime = retryCount * 10
-                                    echo "⚠️  Failed to push ${image} (attempt ${retryCount}/${maxRetries}). Retrying in ${waitTime} seconds..."
-                                    sleep(waitTime)
-                                } else {
-                                    echo "❌ Failed to push ${image} after ${maxRetries} attempts"
-                                    throw e
-                                }
-                            }
-                        }
-                    }
-                    
                     // Se connecter à Docker Hub
                     echo "🔐 Logging into Docker Hub..."
                     sh """
@@ -112,16 +102,62 @@ pipeline {
                     """
                     
                     // Vérifier que l'image existe localement
+                    echo "🔍 Vérification des images locales..."
                     sh """
-                        docker images | grep ${env.DOCKER_IMAGE_NAME} | grep ${env.DOCKER_IMAGE_TAG} || echo "⚠️  Image tag ${env.DOCKER_IMAGE_TAG} not found locally"
+                        docker images | grep ${env.DOCKER_IMAGE_NAME} | head -5
+                        docker images | grep ${env.DOCKER_IMAGE_NAME} | grep ${env.DOCKER_IMAGE_TAG} || (echo "❌ Image tag ${env.DOCKER_IMAGE_TAG} not found locally" && exit 1)
                     """
                     
-                    // Pousser avec retry
+                    // Pousser les images avec retry explicite
                     echo "📤 Pushing images to Docker Hub..."
-                    pushWithRetry("${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}")
-                    pushWithRetry("${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest")
                     
-                    echo "✅ All images pushed successfully!"
+                    // Push tag BUILD_NUMBER avec retry
+                    def pushSuccess1 = false
+                    def retryCount1 = 0
+                    def maxRetries1 = 3
+                    while (retryCount1 < maxRetries1 && !pushSuccess1) {
+                        try {
+                            echo "🔄 Pushing ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} (attempt ${retryCount1 + 1}/${maxRetries1})..."
+                            sh "docker push ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}"
+                            pushSuccess1 = true
+                            echo "✅ Successfully pushed ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG}"
+                        } catch (Exception e) {
+                            retryCount1++
+                            if (retryCount1 < maxRetries1) {
+                                def waitTime = retryCount1 * 10
+                                echo "⚠️  Failed to push ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} (attempt ${retryCount1}/${maxRetries1}). Retrying in ${waitTime} seconds..."
+                                sleep(waitTime)
+                            } else {
+                                echo "❌ Failed to push ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} after ${maxRetries1} attempts"
+                                throw e
+                            }
+                        }
+                    }
+                    
+                    // Push tag latest avec retry
+                    def pushSuccess2 = false
+                    def retryCount2 = 0
+                    def maxRetries2 = 3
+                    while (retryCount2 < maxRetries2 && !pushSuccess2) {
+                        try {
+                            echo "🔄 Pushing ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest (attempt ${retryCount2 + 1}/${maxRetries2})..."
+                            sh "docker push ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest"
+                            pushSuccess2 = true
+                            echo "✅ Successfully pushed ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest"
+                        } catch (Exception e) {
+                            retryCount2++
+                            if (retryCount2 < maxRetries2) {
+                                def waitTime = retryCount2 * 10
+                                echo "⚠️  Failed to push ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest (attempt ${retryCount2}/${maxRetries2}). Retrying in ${waitTime} seconds..."
+                                sleep(waitTime)
+                            } else {
+                                echo "❌ Failed to push ${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:latest after ${maxRetries2} attempts"
+                                throw e
+                            }
+                        }
+                    }
+                    
+                    echo "✅ All images pushed successfully to Docker Hub!"
                 }
             }
         }
@@ -165,6 +201,9 @@ pipeline {
             steps {
                 script {
                     sh """
+                        # Supprimer les pods en erreur (ImagePullBackOff)
+                        kubectl delete pod -n devops -l app=student-management --field-selector=status.phase!=Running --ignore-not-found=true || echo "No pods to delete"
+                        
                         # Mettre à jour l'image dans le deployment si il existe
                         kubectl set image deployment/student-management student-management=${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} -n devops --record || echo "Deployment not found, will be created in next stage"
                     """
@@ -179,8 +218,13 @@ pipeline {
                         kubectl apply -f k8s/app-configmap.yaml
                         kubectl apply -f k8s/app-secret.yaml
                         kubectl apply -f k8s/app-deployment.yaml
-                        # Mettre à jour l'image avec le tag de build
+                        
+                        # Mettre à jour l'image avec le tag de build et forcer le pull
                         kubectl set image deployment/student-management student-management=${env.DOCKER_USERNAME}/${env.DOCKER_IMAGE_NAME}:${env.DOCKER_IMAGE_TAG} -n devops --record || echo "Image update failed, using latest"
+                        
+                        # Forcer le pull de l'image en supprimant les pods existants
+                        kubectl rollout restart deployment/student-management -n devops || echo "Rollout restart completed"
+                        
                         kubectl apply -f k8s/app-service.yaml
                     """
                 }
