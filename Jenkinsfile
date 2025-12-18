@@ -343,8 +343,9 @@ pipeline {
                         
                         # Mettre à jour la configuration Prometheus avec l'IP WSL
                         if [ -f k8s/prometheus-config.yaml ]; then
-                            sed -i "s|172\.29\.114\.102:8080|\${WSL_IP}:8080|g" k8s/prometheus-config.yaml 2>/dev/null || true
-                            sed -i "s|172\.29\.114\.102:9100|\${WSL_IP}:9100|g" k8s/prometheus-config.yaml 2>/dev/null || true
+                            OLD_IP="172.29.114.102"
+                            sed -i "s|\${OLD_IP}:8080|\${WSL_IP}:8080|g" k8s/prometheus-config.yaml 2>/dev/null || true
+                            sed -i "s|\${OLD_IP}:9100|\${WSL_IP}:9100|g" k8s/prometheus-config.yaml 2>/dev/null || true
                             echo "✅ Configuration Prometheus mise à jour avec IP WSL: \$WSL_IP"
                         fi
                         
